@@ -1,7 +1,7 @@
 import numpy as np
 import gym
 
-class MinAtari_wrapper(gym.ObservationWrapper):
+class MinAtar_wrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
 

@@ -13,7 +13,6 @@ class MountainCar(gym.Env):
         self.observation_space = spaces.Box(low=np.array([-1.2, -0.07], dtype=np.float32),
                                             high=np.array([0.5, 0.07], dtype=np.float32))
         self.action_space = spaces.Discrete(3)
-        self._max_episode_steps = 500
 
         # reward
         self.rewardStd = rewardStd

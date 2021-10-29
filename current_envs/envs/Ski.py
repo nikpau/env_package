@@ -33,8 +33,7 @@ class Ski(gym.Env):
 
         # time step, max episode steps and length of river
         self.delta_t = 5
-        self.current_timestep = 0 
-        self._max_episode_steps = 500
+        self.current_timestep = 0
         
         # rendering
         self.plot_delay = 0.001

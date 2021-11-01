@@ -2,7 +2,7 @@ import numpy as np
 import pybulletgym
 import gym
 
-class POMDP_wrapper(gym.ObservationWrapper):
+class gym_POMDP_wrapper(gym.ObservationWrapper):
     def __init__(self, env_name, pomdp_type='remove_velocity',
                  flicker_prob=0.2, random_noise_sigma=0.1, random_sensor_missing_prob=0.1):
         """

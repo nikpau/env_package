@@ -26,10 +26,6 @@ class ObstacleAvoidance(gym.Env):
         self.n_vessels_half  = int(self.n_vessels/2)
         self.max_temporal_dist = 300 # maximal temporal distance when placing new vessel
 
-        # maximum sight of agent
-        self.delta_x_max = 3000
-        self.delta_y_max = 3000
-
         # initial agent position, speed and acceleration
         self.start_x_agent = 0
         self.start_y_agent = 0
@@ -40,14 +36,19 @@ class ObstacleAvoidance(gym.Env):
 
         # speed and acceleration of vessels
         self.vx_max = 5
-        self.vy_max = 5
+        self.vy_max = 1
         self.ax_max = 0
         self.ay_max = 0.01
         self.jerk_max = 0.001
 
+        # maximum sight of agent
+        self.delta_x_max = self.max_temporal_dist * self.vx_max
+        self.delta_y_max = self.max_temporal_dist * self.vy_max
+
         # time step, max episode steps and length of river
         self.delta_t = 5
         self.current_timestep = 0
+        self.max_episode_steps = 500
         
         # rendering
         self.plot_delay   = 0.001
@@ -102,7 +103,7 @@ class ObstacleAvoidance(gym.Env):
 
     def _set_AR1(self):
         """Sets the AR1 Array containing the desired lateral trajectory for all episode steps."""
-        self.AR1 = np.zeros(self._max_episode_steps+2000, dtype=np.float32) 
+        self.AR1 = np.zeros(self.max_episode_steps + int(self.n_vessels_half * self.max_temporal_dist / self.delta_t), dtype=np.float32) 
         for i in range(self.AR1.size-1):
             self.AR1[i+1] = self.AR1[i] * 0.99 + np.random.normal(0,np.sqrt(800))
 
@@ -114,7 +115,7 @@ class ObstacleAvoidance(gym.Env):
         self.agent_x = self.start_x_agent
         self.agent_y = self.start_y_agent
         self.agent_vx = np.random.uniform(1,self.vx_max)
-        self.x_max = np.ceil(self.agent_vx * self._max_episode_steps * self.delta_t) # set window length by chosen longitudinal speed
+        self.x_max = np.ceil(self.agent_vx * self.max_episode_steps * self.delta_t) # set window length by chosen longitudinal speed
         self.agent_vy = self.v_y_agent
         self.agent_ax = self.a_x_agent
         self.agent_ay = self.a_y_agent 
@@ -156,9 +157,11 @@ class ObstacleAvoidance(gym.Env):
 
         # compute new vessel dynamics
         y_future = self.AR1[abs(int(self.current_timestep + new_ttc/self.delta_t))] + vessel_direction * np.maximum(40, np.random.normal(100,50))
+        
         new_vx = np.random.uniform(-self.vx_max, self.vx_max)
         new_x = (self.agent_vx - new_vx) * new_ttc + self.agent_x
-        new_vy = self.vy_max * np.random.uniform(-1,1)
+
+        new_vy = np.random.uniform(-self.vy_max, self.vy_max)
         new_y = y_future - new_vy * new_ttc
 
         # rotate dynamic arrays to place new vessel at the end
@@ -209,16 +212,17 @@ class ObstacleAvoidance(gym.Env):
             vy = self.vessel_vy[idx].copy()
 
         # state definition
-        self.state = np.empty(0, dtype=np.float32)
-        self.state = np.append(self.state, self.agent_ay/self.ay_max)
-        self.state = np.append(self.state, self.agent_vy/self.vy_max)
+        self.state = np.array([self.agent_ay/self.ay_max, self.agent_vy/self.vy_max])
         self.state = np.append(self.state, (self.agent_x  - x)/self.delta_x_max)
         self.state = np.append(self.state, (self.agent_y  - y)/self.delta_y_max)
 
         # POMDP specs
         if self.POMDP_type in ["MDP", "FL"]:
-            self.state = np.append(self.state, (self.agent_vx - vx)/(2*self.vx_max))
-            self.state = np.append(self.state, (self.agent_vy - vy)/(2*self.vy_max))
+            v_obs = (self.agent_vx - vx)/(2*self.vx_max)
+            v_obs = np.append(v_obs, (self.agent_vy - vy)/(2*self.vy_max))
+                              
+            self.state = np.append(self.state, v_obs)
+
         if self.POMDP_type == "FL" and np.random.binomial(1, self.FL_prob) == 1:
             self.state = np.zeros_like(self.state)
 
@@ -253,9 +257,8 @@ class ObstacleAvoidance(gym.Env):
 
         for i in range(self.n_vessels):
 
-            # lateral dynamics for ships with positive TTC
-            if self.vessel_ttc[i] > 0:
-                self.vessel_y[i] = self.vessel_y[i] + self.vessel_vy[i] * self.delta_t
+            # lateral dynamics
+            self.vessel_y[i] = self.vessel_y[i] + self.vessel_vy[i] * self.delta_t
 
             # longitudinal dynamics     
             self.vessel_x[i] = self.vessel_x[i] + self.vessel_vx[i] * self.delta_t
@@ -267,23 +270,23 @@ class ObstacleAvoidance(gym.Env):
 
             while self.vessel_ttc[self.n_vessels_half+1] < 0:
                 self._place_vessel(False, 1)           
-    
+
     def _move_agent(self, action):
         """Update self.agent_pos using a given action. For now: a_x = 0."""
         self.agent_ay_old = self.agent_ay
 
         # update lateral dynamics
-        self.agent_ay = np.clip(self.agent_ay + action.item() * self.jerk_max, -self.ay_max, self.ay_max)
-
+        self.agent_ay = action.item() * self.ay_max
         agent_vy_new = np.clip(self.agent_vy + self.agent_ay * self.delta_t,-self.vy_max, self.vy_max)
+        
         agent_y_new = self.agent_y + 0.5 * (self.agent_vy + agent_vy_new) * self.delta_t
 
         self.agent_vy = agent_vy_new
         self.agent_y = agent_y_new
 
         # update longitudinal dynamics
-        self.agent_x= self.agent_x + self.agent_vx * self.delta_t
-        
+        self.agent_x = self.agent_x + self.agent_vx * self.delta_t
+
     def _calculate_reward(self):
         """Returns reward of the current state."""
 
@@ -303,8 +306,8 @@ class ObstacleAvoidance(gym.Env):
     
     def _done(self):
         """Returns boolean flag whether episode is over."""
-        return True if self.current_timestep >= self._max_episode_steps else False
-    
+        return False
+
     def render(self, agent_name=None):
         """Renders the current environment."""
 

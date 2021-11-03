@@ -45,13 +45,13 @@ class Ski(gym.Env):
         
         # --------------------------------  gym inherits ---------------------------------------------------
         if self.POMDP_type == "RV":
-            num_vessel_obs = 3
+            num_vessel_obs = 2
         else:
-            num_vessel_obs = 5
+            num_vessel_obs = 4
 
         super(Ski, self).__init__()
-        self.observation_space = spaces.Box(low=np.full((1, self.frame_stack * num_vessel_obs), -1, dtype=np.float32)[0],
-                                            high=np.full((1, self.frame_stack * num_vessel_obs), 1, dtype=np.float32)[0])
+        self.observation_space = spaces.Box(low=np.full((1, self.frame_stack * (num_vessel_obs + 2)), -1, dtype=np.float32)[0],
+                                            high=np.full((1, self.frame_stack * (num_vessel_obs + 2)), 1, dtype=np.float32)[0])
         self.action_space = spaces.Box(low=np.array([-1], dtype=np.float32), 
                                        high=np.array([1], dtype=np.float32))
         
@@ -88,9 +88,10 @@ class Ski(gym.Env):
     
     def _set_state(self):
         """Sets state which is flattened, ordered with ascending TTC, normalized and clipped to [-1, 1]"""        
-        self.state = np.array([(self.agent_x - self.obst_x)/self.delta_x_max,
-                               (self.agent_y - self.obst_y)/self.delta_y_max,                              
-                                self.agent_ay/self.ay_max])
+        self.state = np.array([self.agent_ay/self.ay_max,
+                               self.agent_vy/self.vy_max
+                               (self.agent_x - self.obst_x)/self.delta_x_max,
+                               (self.agent_y - self.obst_y)/self.delta_y_max])
 
         # POMDP specs
         if self.POMDP_type == "MDP":
@@ -136,9 +137,6 @@ class Ski(gym.Env):
         self.agent_ay_old = self.agent_ay
 
         # update lateral dynamics
-        #self.agent_ay = np.clip(self.agent_ay + action.item() * self.jerk_max, -self.ay_max, self.ay_max)
-        #self.agent_ay = np.clip(self.agent_ay  -1              * self.jerk_max, -self.ay_max, self.ay_max)
-
         self.agent_ay = action.item() * self.ay_max
         agent_vy_new = np.clip(self.agent_vy + self.agent_ay * self.delta_t,-self.vy_max, self.vy_max)
 
@@ -149,7 +147,7 @@ class Ski(gym.Env):
 
         # update longitudinal dynamics
         self.agent_x = self.agent_x + self.agent_vx * self.delta_t
-        
+
     def _calculate_reward(self):
         """Returns reward of the current state."""   
         if abs(self.agent_y - self.obst_y) < self.goalwidth/2:

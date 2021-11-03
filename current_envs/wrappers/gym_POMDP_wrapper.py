@@ -3,7 +3,7 @@ import pybulletgym
 import gym
 
 class gym_POMDP_wrapper(gym.ObservationWrapper):
-    def __init__(self, env_name, pomdp_type='remove_velocity',
+    def __init__(self, env, env_name, pomdp_type='remove_velocity',
                  flicker_prob=0.2, random_noise_sigma=0.1, random_sensor_missing_prob=0.1):
         """
         :param env_name:
@@ -20,7 +20,7 @@ class gym_POMDP_wrapper(gym.ObservationWrapper):
             9.  random_noise_and_random_sensor_missing
             10. random_sensor_missing_and_random_noise:
         """
-        super().__init__(gym.make(env_name))
+        super().__init__(env)
         self.pomdp_type = pomdp_type
         self.flicker_prob = flicker_prob
         self.random_noise_sigma = random_noise_sigma

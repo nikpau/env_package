@@ -89,7 +89,7 @@ class Ski(gym.Env):
     def _set_state(self):
         """Sets state which is flattened, ordered with ascending TTC, normalized and clipped to [-1, 1]"""        
         self.state = np.array([self.agent_ay/self.ay_max,
-                               self.agent_vy/self.vy_max
+                               self.agent_vy/self.vy_max,
                                (self.agent_x - self.obst_x)/self.delta_x_max,
                                (self.agent_y - self.obst_y)/self.delta_y_max])
 

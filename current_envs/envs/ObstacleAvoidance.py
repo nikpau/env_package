@@ -36,7 +36,7 @@ class ObstacleAvoidance(gym.Env):
 
         # speed and acceleration of vessels
         self.vx_max = 5
-        self.vy_max = 1
+        self.vy_max = 5
         self.ax_max = 0
         self.ay_max = 0.01
         self.jerk_max = 0.001

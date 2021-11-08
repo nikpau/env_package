@@ -16,7 +16,7 @@ class Ski(gym.Env):
         self.POMDP_type  = POMDP_type
         self.frame_stack = frame_stack
 
-        self.goalwidth = 50
+        self.goalwidth = 80
         self.max_goal_end_y = 200
         self.max_temporal_dist = 300 # maximal temporal distance when placing new vessel
 

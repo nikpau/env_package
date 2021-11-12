@@ -8,7 +8,7 @@ from gym import spaces
 class ObstacleAvoidance(gym.Env):
     """Class environment with initializer, step, reset and render method."""
     
-    def __init__(self, POMDP_type="MDP", frame_stack=1):
+    def __init__(self, POMDP_type="MDP", frame_stack=1, n_vessels=12, max_temporal_dist=300):
         
         # ----------------------------- settings and hyperparameter -----------------------------------------
 
@@ -22,9 +22,9 @@ class ObstacleAvoidance(gym.Env):
 
         # river size and vessel characteristics   
         self.y_max = 500 # only for plotting
-        self.n_vessels  = 12
+        self.n_vessels  = n_vessels
         self.n_vessels_half  = int(self.n_vessels/2)
-        self.max_temporal_dist = 300 # maximal temporal distance when placing new vessel
+        self.max_temporal_dist = max_temporal_dist # maximal temporal distance when placing new vessel
 
         # initial agent position, speed and acceleration
         self.start_x_agent = 0

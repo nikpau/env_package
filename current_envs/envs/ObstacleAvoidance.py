@@ -1,8 +1,9 @@
-import numpy as np
-from scipy.stats import norm
-from matplotlib import pyplot as plt
+import math
+
 import gym
+import numpy as np
 from gym import spaces
+from matplotlib import pyplot as plt
 
 
 class ObstacleAvoidance(gym.Env):
@@ -58,9 +59,8 @@ class ObstacleAvoidance(gym.Env):
         self.line_color = "black"
 
         # reward config
-        self.variance_x = 12000
-        self.variance_y = 25
-        self.variance_ttc = 25
+        self.sd_y = 25
+        self.sd_ttc = 25
         
         # --------------------------------  gym inherits ---------------------------------------------------
         if self.POMDP_type == "RV":
@@ -295,15 +295,18 @@ class ObstacleAvoidance(gym.Env):
 
         for i in range(self.n_vessels_half):
             vess_reward1 = np.maximum(vess_reward1, 
-                                      norm.pdf(self.vessel_ttc[i],0,self.variance_ttc)/norm.pdf(0,0,self.variance_ttc) *
-                                      norm.pdf(np.maximum(0,self.agent_y-self.vessel_y[i]),0,self.variance_y)/norm.pdf(0,0,self.variance_y))
+                                      self._norm_pdf(self.vessel_ttc[i],0,self.sd_ttc)/self._norm_pdf(0,0,self.sd_ttc) *
+                                      self._norm_pdf(np.maximum(0,self.agent_y-self.vessel_y[i]),0,self.sd_y)/self._norm_pdf(0,0,self.sd_y))
             vess_reward2 = np.maximum(vess_reward2, 
-                                      norm.pdf(self.vessel_ttc[self.n_vessels_half+i],0,self.variance_ttc)/norm.pdf(0,0,self.variance_ttc) *
-                                      norm.pdf(np.maximum(0,self.vessel_y[self.n_vessels_half+i]-self.agent_y),0,self.variance_y)/norm.pdf(0,0,self.variance_y))
+                                      self._norm_pdf(self.vessel_ttc[self.n_vessels_half+i],0,self.sd_ttc)/self._norm_pdf(0,0,self.sd_ttc) *
+                                      self._norm_pdf(np.maximum(0,self.vessel_y[self.n_vessels_half+i]-self.agent_y),0,self.sd_y)/self._norm_pdf(0,0,self.sd_y))
         #self.reward = - (np.abs(vess_reward1-vess_reward2))/(np.maximum(-vess_reward1,-vess_reward2)+1)
         self.reward = - np.maximum(vess_reward1, vess_reward2)
         self.reward = self.reward.item()
-    
+
+    def _norm_pdf(self, x, mu, sd):
+        return 1 / math.sqrt(2 * math.pi * sd**2) * math.exp(-(x - mu)**2 / (2*sd**2))
+
     def _done(self):
         """Returns boolean flag whether episode is over."""
         return False

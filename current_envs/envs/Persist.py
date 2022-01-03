@@ -20,7 +20,7 @@ class Persist(gym.Env):
 
         # Path to initial config file. This is still needed to initialize the
         # river correctly, although all values get overwritten anyways
-        self.c_path = "/home/niklaspaulig/Dropbox/TU Dresden/persist_python/train.ini"
+        self.c_path = "/home/s2075466/persist_data/train.ini"
 
         # Overwrite the number of ships to initialize.
         _overwrite_config(self.c_path, vessels)

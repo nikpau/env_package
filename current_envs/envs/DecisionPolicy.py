@@ -50,7 +50,8 @@ class DecisionPolicy(gym.Env):
 
         # Path to initial config file. This is still needed to initialize the
         # river correctly, although all values get overwritten anyways
-        self.c_path = "/home/neural/Dropbox/TU Dresden/persist_python/train.ini"
+        #self.c_path = "/home/neural/Dropbox/TU Dresden/persist_python/train.ini"
+        self.c_path = "/home/s2075466/persist_data/train.ini"
         
         # Overwrite the number of ships to initialize.
         _overwrite_config(self.c_path, vessels)
@@ -112,14 +113,14 @@ class DecisionPolicy(gym.Env):
         self.r_const = 1.05
         
         # Gym inherits
-        self.observation_space = spaces.Box(high=np.inf, low=-np.inf, shape=(10*self.n_vessel+1,))
+        self.observation_space = spaces.Box(high=np.inf, low=-np.inf, shape=(11*self.n_vessel,))
         self.action_space = spaces.Discrete(4) # {0,1,2,3}
 
 
     def reset(self):
         
         # Randomize the initial starting position of the agent
-        self.agent_x_start = np.float(random.randrange(20_000, 30_000, 100))
+        self.agent_x_start = np.float(random.randrange(20_000, 90_000, 500))
 
         # Generate random directions for non-agent-vessels
         dirs = _rand_directions(self.n_vessel - 1)
@@ -219,7 +220,7 @@ class DecisionPolicy(gym.Env):
 
 
         # TODO Order of observations??
-        obs = np.hstack(wd,str_vel,river_prof)        
+        obs = np.hstack([wd,str_vel,river_prof])
         return obs
     
     # Receive vessel properties and normalize them before return
@@ -306,7 +307,7 @@ class DecisionPolicy(gym.Env):
             angle_reward = 0.
         
         if self.v.overtaking_level[self.AGENT_ID] != 0:
-            otl_reward = -0.001
+            otl_reward = -0.01
         else:
             otl_reward = 0.
         
@@ -418,14 +419,14 @@ def _overwrite_config(path: str, n_vessels: int) -> None:
 
 # ---------------------------------------------
 
-#env = DecisionPolicy(10)
-#f = env.reset()
-#print(f.shape)
-#rs = []
-#ax = []
-#for _ in range(1000):
-#    s,r,d,_ = env.step(1)
-    #rs.append(r)
-    # ax.append(env.v.ax[0])
-    #print(f"Step: {env.current_timestep} Cum Reward: {np.sum(rs)}")
- #   print(s.shape)
+# env = DecisionPolicy(10)
+# f = env.reset()
+# print(f.shape)
+# rs = []
+# ax = []
+# for _ in range(1000):
+#     s,r,d,_ = env.step(1)
+#     rs.append(r)
+#     # ax.append(env.v.ax[0])
+#     print(f"Step: {env.current_timestep} Cum Reward: {np.sum(rs)}")
+#     print(s.shape)

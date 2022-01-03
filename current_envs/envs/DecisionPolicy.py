@@ -112,7 +112,7 @@ class DecisionPolicy(gym.Env):
         self.r_const = 1.05
         
         # Gym inherits
-        self.observation_space = spaces.Box(high=np.inf, low=-np.inf, shape=(8*self.n_vessel+8190,))
+        self.observation_space = spaces.Box(high=np.inf, low=-np.inf, shape=(10*self.n_vessel+1,))
         self.action_space = spaces.Discrete(4) # {0,1,2,3}
 
 
@@ -213,51 +213,14 @@ class DecisionPolicy(gym.Env):
     # self.visible_range = [min(lookbehind), max(lookahead)]
     def _get_river_properties(self) -> np.array:
         
-        agent_x = self.v.x_location[self.AGENT_ID]
-        agent_len = self.v.length[self.AGENT_ID]
+        wd = self.r.get_water_depth(self.v)
+        str_vel = self.r.mean_stream_vel(self.v)
+        river_prof = self.r.get_river_profile(self.v)
 
-        x_start_ahead = int(np.round((agent_x + agent_len / 2) / self.bpd))
-        x_end_ahead = x_start_ahead + int(self.agent_lookahead/self.bpd)
-
-        x_start_behind = int(np.round((agent_x - agent_len / 2) / self.bpd))
-        x_end_behind = x_start_behind - int(self.agent_lookbehind/self.bpd)
-
-        # Standardized Waterdepth
-        lookahead_wd = self.r.water_depth[x_start_ahead:x_end_ahead,:]
-        lookahead_wd = (lookahead_wd - self.mean_water_depth) / self.sd_water_depth
-
-        lookbehind_wd = self.r.water_depth[x_end_behind:x_start_behind,:]
-        lookbehind_wd = lookbehind_wd - self.mean_water_depth / self.sd_water_depth
-
-        # Standardized Stream velocity
-        lookahead_sv = self.r.stream_vel[x_start_ahead:x_end_ahead,:]
-        lookahead_sv = (lookahead_sv - self.mean_str_vel) / self.sd_str_vel
-
-        lookbehind_sv = self.r.stream_vel[x_end_behind:x_start_behind,:]
-        lookbehind_sv = (lookahead_sv - self.mean_str_vel) / self.sd_str_vel
-
-        # The visible range can the thought of as the minimum and maximum x
-        # value the agent considers in his lookahead and lookbehind distance
-        #
-        #                                      RIVER ->
-        # ========|=======|=======|========================================|
-        #         |LOOK-  |       |                                        |
-        #         |       |[AGENT]|            LOOKAHEAD                   |
-        #         |BEHIND |       |                                        |
-        # ========|=======|=======|========================================|
-        #         |---------------------VISIBLE RANGE----------------------|
-
-        self.visible_range = np.array([x_end_behind, x_end_ahead])
 
         # TODO Order of observations??
-        obs = np.array([
-            lookbehind_sv.flatten(),
-            lookahead_sv.flatten(),
-            lookbehind_wd.flatten(),
-            lookahead_wd.flatten()
-        ])
-        
-        return np.hstack(obs)
+        obs = np.hstack(wd,str_vel,river_prof)        
+        return obs
     
     # Receive vessel properties and normalize them before return
     def _get_vessel_propterties(self) -> np.array:

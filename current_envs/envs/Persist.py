@@ -76,7 +76,7 @@ class Persist(gym.Env):
         self.crash_dist = 5  # Minimum distance from border causing a crash
 
         # Anything reward
-        self.r_const = 1.05
+        self.r_const = 1.1
 
         # Gym inherits
         self.observation_space = spaces.Box(
@@ -87,7 +87,7 @@ class Persist(gym.Env):
     def reset(self):
 
         # Randomize the initial starting position of the agent
-        self.agent_x_start = float(random.randrange(20_000, 30_000, 100))
+        self.agent_x_start = float(random.randrange(20_000, 90_000, 500))
 
         # Generate random directions for non-agent-vessels
         dirs = _rand_directions(self.n_vessel - 1)

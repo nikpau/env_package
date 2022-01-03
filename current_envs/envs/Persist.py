@@ -20,7 +20,8 @@ class Persist(gym.Env):
 
         # Path to initial config file. This is still needed to initialize the
         # river correctly, although all values get overwritten anyways
-        self.c_path = "/home/s2075466/persist_data/train.ini"
+        #self.c_path = "/home/s2075466/persist_data/train.ini"
+        self.c_path = "/home/niklaspaulig/Dropbox/TU Dresden/persist_python/train.ini"
 
         # Overwrite the number of ships to initialize.
         _overwrite_config(self.c_path, vessels)
@@ -57,10 +58,7 @@ class Persist(gym.Env):
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
-        self.v = v.Ships(self.r, self.c_path)
-
-        # Initializer renderer
-        self.plotter = Plotter(self.r,self.v,self.c_path)
+        #self.v = v.Ships(self.r, self.c_path)
 
         self.max_power = 1E6
         self.max_x = self.r.water_depth.shape[0] * \
@@ -89,7 +87,7 @@ class Persist(gym.Env):
     def reset(self):
 
         # Randomize the initial starting position of the agent
-        self.agent_x_start = np.float(random.randrange(20_000, 30_000, 100))
+        self.agent_x_start = float(random.randrange(20_000, 30_000, 100))
 
         # Generate random directions for non-agent-vessels
         dirs = _rand_directions(self.n_vessel - 1)
@@ -100,6 +98,9 @@ class Persist(gym.Env):
 
         # Load an empty ship instance in order to manually override its values
         self.v = v.Ships(self.r, self.c_path)
+
+        # Initializer renderer
+        self.plotter = Plotter(self.r,self.v,self.c_path)
 
         # Override vessel properties according to train env
         self.v.num_ships = self.n_vessel
@@ -123,7 +124,7 @@ class Persist(gym.Env):
         #
         # ------------------------------------------------------------------------
         # |equal dist| is currently set to 300, however this is arbitrary
-        equaldist = 500
+        equaldist = 1000
         self.v.x_location = np.array([
             np.array([self.agent_x_start]),
             self.agent_x_start +
@@ -152,6 +153,8 @@ class Persist(gym.Env):
         str_vel = self.r.mean_stream_vel(self.v)
 
         lat_action, long_action = action
+
+        long_action = 0. if long_action < 0 else long_action
 
         self.v.power[self.AGENT_ID] = np.maximum(0, self.v.desired_power[self.AGENT_ID] * long_action)
 
@@ -243,7 +246,19 @@ class Persist(gym.Env):
                 self.resp.append(id)
                 continue
             else:
-                self.v.dummy_timestep(id, self.r, self.dT, wd, r_prof, str_vel)
+            # Follow the coasline
+                dag,_,_ = self.v.pol[id]._dist_to_aground()
+                if dag < self.opt_dist:
+                    if self.v.direction[id] == 1:
+                        self.v.y_location[id] = self.v.y_location[id] + (self.opt_dist - dag)
+                    else:
+                        self.v.y_location[id] = self.v.y_location[id] - (self.opt_dist - dag)
+                else:
+                    if self.v.direction[id] == 1:
+                        self.v.y_location[id] = self.v.y_location[id] - (dag - self.opt_dist)
+                    else:
+                        self.v.y_location[id] = self.v.y_location[id] + (dag - self.opt_dist)
+            self.v.compute_heading_from_cf(id)
 
         # Respawn vessels that are invisible to the agent
         self._respawn(self._invisible)
@@ -333,7 +348,7 @@ class Persist(gym.Env):
 
     # Reset x and y dynamics for a given vessel ID
     def _reset_dynamics(self, ID: int) -> None:
-        self.v.vx[ID] = np.array([1. if self.v.direction[ID] == 1 else -1.])
+        self.v.vx[ID] = 0.
         self.v.vy[ID] = 0.
         self.v.ax[ID] = 0.
         self.v.ay[ID] = 0.
@@ -417,3 +432,9 @@ def _overwrite_config(path: str, n_vessels: int) -> None:
         conf.write(f)
 
 # ---------------------------------------------
+env = Persist(10)
+s = env.reset()
+for _ in range(1000):
+    s2,r,d,_ = env.step([0.,0.])
+    print(env.v.y_location,env.current_timestep)
+    env.render()

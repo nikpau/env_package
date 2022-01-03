@@ -430,11 +430,3 @@ def _overwrite_config(path: str, n_vessels: int) -> None:
     conf.set("Ships", "directions", dummy)
     with open(path, "w") as f:
         conf.write(f)
-
-# ---------------------------------------------
-env = Persist(10)
-s = env.reset()
-for _ in range(1000):
-    s2,r,d,_ = env.step([0.,0.])
-    print(env.v.y_location,env.current_timestep)
-    env.render()

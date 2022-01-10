@@ -54,7 +54,7 @@ class Persist(gym.Env):
         self.tc = counter()
         self.current_timestep = self.tc()
 
-        self.max_episode_steps = 2000
+        self.max_episode_steps = 8000
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
@@ -76,7 +76,7 @@ class Persist(gym.Env):
         self.crash_dist = 5  # Minimum distance from border causing a crash
 
         # Anything reward
-        self.r_const = 1.1
+        self.r_const = 1.3
 
         # Gym inherits
         self.observation_space = spaces.Box(
@@ -124,12 +124,12 @@ class Persist(gym.Env):
         #
         # ------------------------------------------------------------------------
         # |equal dist| is currently set to 300, however this is arbitrary
-        equaldist = 1000
+        self.equaldist = 500
         self.v.x_location = np.array([
             np.array([self.agent_x_start]),
             self.agent_x_start +
-            np.linspace(equaldist, (self.n_vessel-1)
-                        * equaldist, self.n_vessel-1)
+            np.linspace(self.equaldist, (self.n_vessel-1)
+                        * self.equaldist, self.n_vessel-1)
         ], dtype=object)
         self.v.x_location = np.hstack(self.v.x_location)
 
@@ -309,12 +309,12 @@ class Persist(gym.Env):
         self.resp = []
 
     # Check whether the spawning of a new vessel would cause a collision
-    # i.e See if a vessel is present 2 time its length around the xloc of the vessel to be spawned
+    # i.e See if a vessel is present inside the 
+    # equaldist of the last vessel in ascending x direction
     def _spawn_collision(self, spawn_loc: float) -> bool:
         for id in self.v.ship_id:
             xpos = self.v.x_location[id]
-            l = self.v.length[id]
-            if abs(spawn_loc - xpos) < 2*l:
+            if abs(spawn_loc - xpos) < self.equaldist:
                 return True
             else:
                 continue
@@ -329,12 +329,15 @@ class Persist(gym.Env):
         dist_diff = self.dist_to_goal - n_dist_to_goal
 
         # Distance reward
-        dr = np.sign(dist_diff) * pow(c, dist_diff)
+        if np.sign(dist_diff) == 1:
+            dr = (np.sign(dist_diff) * pow(c, dist_diff)) - 1
+        else:
+            dr = (np.sign(dist_diff) * pow(c, dist_diff)) + 1
 
         # Get the distance to the fairway border and
         # the reward based on it
         lane_reward = self._lane_reward(self.dist_to_any_border)
-
+        print(np.round(lane_reward,2), np.round(self.dist_to_any_border,2),end="\r")
         ttc = self._ttc_reward()
 
         # Overwrite the current distance to the goal
@@ -358,37 +361,55 @@ class Persist(gym.Env):
     def _done(self) -> bool:
         return False
 
+    # def _lane_reward(self, dist: float) -> float:
+
+    #     def base(x):
+    #         return -1/(0.01*x)
+
+    #     if dist > self.crash_dist and dist < self.opt_dist:
+    #         return base(dist) - base(self.opt_dist)
+    #     else:
+    #         return -pow(dist - self.opt_dist, 2)/pow(self.opt_dist, 2)
+    
     def _lane_reward(self, dist: float) -> float:
 
-        def base(x):
-            return -1/(0.1*x)
+        d_opt = self.opt_dist
+        s_1 = 8.
+        s_2 = 10.
+        b_1 = 2.
+        b_2 = 0.8
 
-        if dist > self.crash_dist and dist < self.opt_dist:
-            return base(dist) - base(self.opt_dist)
+        def base(dist,d_opt,s,b):
+            return -pow((dist-d_opt)/s,b)
+
+        if dist <= d_opt:
+            return base(dist,d_opt,s_1,b_1)
         else:
-            return -pow(dist - self.opt_dist, 2)/pow(self.opt_dist, 2)
-    
+            return base(dist,d_opt,s_2,b_2)
+
     # Calculate reward for time to collision. If vessel is more than 
     def _ttc_reward(self):
         
         # Get the lowest ttc
         min_ttc = np.amin(self.v.pol[self.AGENT_ID].ttc)
         
-        if min_ttc > 60.:
+        if min_ttc > 40.:
             return 0.
-        
-        def int_sqrt(x, n = 5):
-            return math.sqrt(n*x)
 
-        return int_sqrt(min_ttc) - int_sqrt(self.opt_dist)
+        s = 8.
+        b = 2.
 
-    def render(self, mode="human"):
+        def base(dist,d_opt,s,b):
+            return -pow((dist-d_opt)/s,b)
+            
+        return base(min_ttc,self.opt_dist,s,b)
+
+    def render(self, mode="human", reward = None):
 
         if mode == "human":
-            self.plotter.update()
+            self.plotter.update(reward)
         else:
-            raise NotImplementedError(
-                "Only human render mode available for now")
+            raise NotImplementedError("Only human render mode available for now")
 
 
 # Helper functions
@@ -430,3 +451,11 @@ def _overwrite_config(path: str, n_vessels: int) -> None:
     conf.set("Ships", "directions", dummy)
     with open(path, "w") as f:
         conf.write(f)
+
+
+# env = Persist(10)
+# s = env.reset()
+
+# for _ in range(1000):
+#     s2,r,d,_ = env.step([0.,0.])
+#     env.render()

@@ -347,6 +347,7 @@ class Persist(gym.Env):
         if crash:
             # TODO Relate to lane and distance reward
             return -0.1 * (dr + lane_reward + ttc)
+
         return dr + lane_reward + ttc
 
     # Reset x and y dynamics for a given vessel ID
@@ -393,7 +394,7 @@ class Persist(gym.Env):
         # Get the lowest ttc
         min_ttc = np.amin(self.v.pol[self.AGENT_ID].ttc)
         
-        if min_ttc > 40.:
+        if min_ttc > 0.04*self.dT:
             return 0.
 
         s = 8.

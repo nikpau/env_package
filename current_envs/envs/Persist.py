@@ -76,11 +76,11 @@ class Persist(gym.Env):
         self.crash_dist = 5  # Minimum distance from border causing a crash
 
         # Anything reward
-        self.r_const = 1.3
+        self.r_const = 1.1
 
         # Gym inherits
         self.observation_space = spaces.Box(
-                high=np.inf, low=-np.inf, shape=((7*self.n_vessel+11),))
+                high=np.inf, low=-np.inf, shape=((9*self.n_vessel+11),))
 
         self.action_space = spaces.Box(low=-1., high=1., shape=(2, 1))
 
@@ -302,7 +302,7 @@ class Persist(gym.Env):
     def _spawn_collision(self, spawn_loc: float) -> bool:
         for id in self.v.ship_id:
             xpos = self.v.x_location[id]
-            if abs(spawn_loc - xpos) < self.equaldist:
+            if abs(spawn_loc - xpos) < self.v.length[self.AGENT_ID]:
                 return True
             else:
                 continue
@@ -317,16 +317,21 @@ class Persist(gym.Env):
         dist_diff = self.dist_to_goal - n_dist_to_goal
 
         # Distance reward
-        if np.sign(dist_diff) == 1:
-            dr = (np.sign(dist_diff) * pow(c, dist_diff)) - 1
-        else:
-            dr = (np.sign(dist_diff) * pow(c, dist_diff)) + 1
+        dr = (np.sign(dist_diff) * pow(c, dist_diff))
+
 
         # Get the distance to the fairway border and
         # the reward based on it
-        lane_reward = self._lane_reward(self.dist_to_any_border)
-        print(np.round(lane_reward,2), np.round(self.dist_to_any_border,2),end="\r")
-        ttc = self._ttc_reward()
+        if self.dist_to_any_border < 60. or self.dist_to_any_border > 200.:
+             lane_reward = -10
+        else:
+            lane_reward = 0.
+
+        min_ttc = np.amin(self.v.pol[self.AGENT_ID].ttc)
+        if min_ttc < 0.04:
+            ttc = -10
+        else:
+            ttc = 0.
 
         # Overwrite the current distance to the goal
         # with the new distance
@@ -334,7 +339,7 @@ class Persist(gym.Env):
 
         if crash:
             # TODO Relate to lane and distance reward
-            return -0.1 * (dr + lane_reward + ttc)
+            return -50
         return dr + lane_reward + ttc
 
     # Reset x and y dynamics for a given vessel ID

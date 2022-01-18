@@ -213,6 +213,10 @@ class DecisionPolicy(gym.Env):
     # self.visible_range = [min(lookbehind), max(lookahead)]
     def _get_river_properties(self) -> np.array:
         
+        # Take the water depth array of the river and subtract 
+        # one from it, to aritificially reduce the river width
+        self.r.water_depth = (self.r.water_depth - 1).clip(min = 0)
+
         agent_x = self.v.x_location[self.AGENT_ID]
         agent_len = self.v.length[self.AGENT_ID]
 
@@ -330,26 +334,26 @@ class DecisionPolicy(gym.Env):
         dist_diff = self.dist_to_goal - n_dist_to_goal
         
         # Distance reward
-        # dr = np.sign(dist_diff) * pow(c, dist_diff)
+        dr = np.sign(dist_diff) * pow(c, dist_diff)
         
         # Angle between agent and its leader
-        cos_theta = self._angle_to_closest_vessel(self._closest_vessel)
-        theta = math.acos(cos_theta) * 180/math.pi
-        print(f"Theta =  {theta}")
+        #cos_theta = self._angle_to_closest_vessel(self._closest_vessel)
+        #theta = math.acos(cos_theta) * 180/math.pi
+        #print(f"Theta = {theta}")
 
-        if theta > 45:
-            angle_reward = 1.
-        else:
-            angle_reward = 0.
+        # if theta > 45:
+        #     angle_reward = 1.
+        # else:
+        #     angle_reward = 0.
         
-        if self.v.overtaking_level[self.AGENT_ID] != 0:
-            otl_reward = -0.001
-        else:
-            otl_reward = 0.
+        # if self.v.overtaking_level[self.AGENT_ID] != 0:
+        #     otl_reward = -0.001
+        # else:
+        #     otl_reward = 0.
         
         self.dist_to_goal = n_dist_to_goal
         
-        return otl_reward + angle_reward
+        return dr
 
     # Find the closest vessel to the agent in the same dir as the agent
     def _closest_vessel(self, dir = 1) -> int:
@@ -403,7 +407,7 @@ class DecisionPolicy(gym.Env):
         
     # Reset x and y dynamics for a given vessel ID
     def _reset_dynamics(self, ID: int) -> None:
-        self.v.vx[ID] = np.array([1. if self.v.direction[ID] == 1 else -1.])
+        self.v.vx[ID] = np.array([2. if self.v.direction[ID] == 1 else -2.])
         self.v.vy[ID] = 0.
         self.v.ax[ID] = 0.
         self.v.ay[ID] = 0.
@@ -423,7 +427,7 @@ def _generate_ylocs(directions: np.array) -> np.array:
     return np.array([190. if n==1 else 310. for n in directions])
 
 def _rand_powers(n_vessels: int) -> np.array:
-    return np.array([random.randrange(3E5, 6E5, 5E4) for _ in range(n_vessels)])
+    return np.array([random.randrange(3E5, 4E5, 5E4) for _ in range(n_vessels)])
 
 # Timestep counter
 def counter() -> Callable:

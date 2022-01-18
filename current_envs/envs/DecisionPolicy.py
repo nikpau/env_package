@@ -194,27 +194,36 @@ class DecisionPolicy(gym.Env):
                 return state, reward, done, {e}
             else:
                 raise RuntimeError(f"Vessel {e[1]} crashed. Pls investigate!")
-        
+
+        # Crash handling. Check if the agent vessel intersects with any other vessel.
+        for id in range(1, self.v.num_ships):
+            if self.v.heading_box[self.AGENT_ID].intersects(self.v.heading_box[id]):
+                reward = self._calc_reward(self.r_const, crash=True)
+                done = True
+                state = np.array([self._get_vessel_propterties(),
+                                  self._get_river_properties()])
+                return state, reward, done, {}
+
         reward = self._calc_reward(self.r_const)
         done = self._done()
         self.current_timestep = self.tc()
-        
+
         # Respawn vessels that are invisible to the agent
         self._respawn(self._invisible)
-        
+
         self.river_state = self._get_river_properties()
         self.vessel_state = self._get_vessel_propterties()
 
         self.state = np.append(self.vessel_state, self.river_state)
         return self.state, reward, done , {}
-        
+
 
     # Return the stream velocity and the water depth for the entire river
     # from the lookbehind to lookahead distance.
     # Also the entire x range from lookbehind to lookahead is saved internally as
     # self.visible_range = [min(lookbehind), max(lookahead)]
     def _get_river_properties(self) -> np.array:
-        
+
         wd = self.r.get_water_depth(self.v)
         str_vel = self.r.mean_stream_vel(self.v)
         river_prof = self.r.get_river_profile(self.v)
@@ -223,7 +232,7 @@ class DecisionPolicy(gym.Env):
         # TODO Order of observations??
         obs = np.hstack([wd,str_vel,river_prof])
         return obs
-    
+
     # Receive vessel properties and normalize them before return
     def _get_vessel_propterties(self) -> np.array:
         obs = np.concatenate([
@@ -237,7 +246,7 @@ class DecisionPolicy(gym.Env):
             self.v.desired_power / self.max_power])
 
         return obs
-    
+
     # Check if any vessel is outside the visible range of the agent
     # and return its index.
     def _invisible(self) -> list:
@@ -285,7 +294,7 @@ class DecisionPolicy(gym.Env):
             else:
                 continue
         return False
-            
+
     # Calculate reward (EXPERIMENTAL)
     # Use reward from Guo et. al (2021)
     def _calc_reward(self, c: float, crash = False) -> float:
@@ -293,10 +302,10 @@ class DecisionPolicy(gym.Env):
             return -20.
         n_dist_to_goal = self.xg - self.v.x_location[self.AGENT_ID]
         dist_diff = self.dist_to_goal - n_dist_to_goal
-        
+
         # Distance reward
         dr = np.sign(dist_diff) * pow(c, dist_diff)
-        
+
         # Angle between agent and its leader
         # cos_theta = self._angle_to_closest_vessel(self._closest_vessel)
         # theta = math.acos(cos_theta) * 180/math.pi
@@ -306,47 +315,47 @@ class DecisionPolicy(gym.Env):
         #     angle_reward = 1.
         # else:
         #     angle_reward = 0.
-        
+
         # if self.v.overtaking_level[self.AGENT_ID] != 0:
         #     otl_reward = -0.01
         # else:
         #     otl_reward = 0.
-        
+
         # self.dist_to_goal = n_dist_to_goal
-        
+
         return dr
 
     # Find the closest vessel to the agent in the same dir as the agent
     def _closest_vessel(self, dir = 1) -> int:
-        
+
         # Get agent x
         agx = self.v.x_location[self.AGENT_ID]
-        
+
         # Get all vessels with same dir and larger x position as agent
         if dir == 1:
             ids = self.v.ship_id[np.where((self.v.direction == 1) & (self.v.x_location > agx))]
         elif dir == -1:
             ids = self.v.ship_id[np.where((self.v.direction == -1) & (self.v.x_location < agx))]
-        
+
         # Get all differences in distances
         diff = self.v.x_location[ids] - agx
-        
+
         # Find lowest index
         if ids.size == 0:
             return []
-        
+
         idx = np.argmin(diff)
-        
+
         return ids[idx]
-    
+
     def _angle_to_closest_vessel(self, find_vessel: Callable) -> float:
-        
+
         # Get the index of the closest vessel
         closest = find_vessel()
-        
+
         if not closest:
             return 0
-        
+
         # Get x and y of closest vessel
         closest_x = self.v.x_location[closest]
         closest_y = self.v.y_location[closest]
@@ -354,18 +363,18 @@ class DecisionPolicy(gym.Env):
         # Get x and y for agent
         agx = self.v.x_location[self.AGENT_ID]
         agy = self.v.y_location[self.AGENT_ID]
-        
+
         xdiff = abs(closest_x - agx)
         ydiff = abs(closest_y - agy) # For both directions
 
         # Distance between vessels
         dbv = math.sqrt(xdiff**2 + ydiff**2)
-        
+
         # Cosine of angle in x direction between agent and closest vessel
         cos_theta = xdiff / dbv
-        
+
         return cos_theta
-        
+
     # Reset x and y dynamics for a given vessel ID
     def _reset_dynamics(self, ID: int) -> None:
         self.v.vx[ID] = np.array([1. if self.v.direction[ID] == 1 else -1.])

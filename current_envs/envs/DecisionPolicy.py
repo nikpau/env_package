@@ -50,8 +50,8 @@ class DecisionPolicy(gym.Env):
 
         # Path to initial config file. This is still needed to initialize the
         # river correctly, although all values get overwritten anyways
-        #self.c_path = "/home/neural/Dropbox/TU Dresden/persist_python/train.ini"
-        self.c_path = "/home/s2075466/persist_data/train.ini"
+        self.c_path = "/home/niklaspaulig/Dropbox/TU Dresden/persist_python/train.ini"
+        #self.c_path = "/home/s2075466/persist_data/train.ini"
         
         # Overwrite the number of ships to initialize.
         _overwrite_config(self.c_path, vessels)
@@ -86,7 +86,7 @@ class DecisionPolicy(gym.Env):
         self.tc = counter()
         self.current_timestep = self.tc()
         
-        self.max_episode_lenth = 2000
+        self.max_episode_length = 2000
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
@@ -187,11 +187,12 @@ class DecisionPolicy(gym.Env):
                 self.v.simulate_timestep(id, self.r, self.dT,wd,r_prof,str_vel)
         except RuntimeError as e:
             if e[1] == self.AGENT_ID:
-                reward = self._calc_reward(self.r_const,crash=True)
-                state = np.array([self._get_vessel_propterties(),
-                                  self._get_river_properties()])
+                reward = self._calc_reward(self.r_const,crash=True)      
+                self.river_state = self._get_river_properties()
+                self.vessel_state = self._get_vessel_propterties()
+                self.state = np.append(self.vessel_state, np.hstack(self.river_state))
                 done = True
-                return state, reward, done, {e}
+                return self.state, reward, done, {e}
             else:
                 raise RuntimeError(f"Vessel {e[1]} crashed. Pls investigate!")
 
@@ -199,10 +200,11 @@ class DecisionPolicy(gym.Env):
         for id in range(1, self.v.num_ships):
             if self.v.heading_box[self.AGENT_ID].intersects(self.v.heading_box[id]):
                 reward = self._calc_reward(self.r_const, crash=True)
-                done = True
-                state = np.array([self._get_vessel_propterties(),
-                                  self._get_river_properties()])
-                return state, reward, done, {}
+                done = True            
+                self.river_state = self._get_river_properties()
+                self.vessel_state = self._get_vessel_propterties()
+                self.state = np.append(self.vessel_state, np.hstack(self.river_state))
+                return self.state, reward, done, {}
         
         reward = self._calc_reward(self.r_const)
         done = self._done()

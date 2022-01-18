@@ -58,7 +58,6 @@ class Persist(gym.Env):
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
-        #self.v = v.Ships(self.r, self.c_path)
 
         self.max_power = 1E6
         self.max_x = self.r.water_depth.shape[0] * \

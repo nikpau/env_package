@@ -90,6 +90,7 @@ class DecisionPolicy(gym.Env):
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
+        self.r.water_depth = (self.r.water_depth - 1).clip(min = 0) # Reduce river width by altering water depth
         
         # Constants for normalization ---------------------------------
         
@@ -289,31 +290,31 @@ class DecisionPolicy(gym.Env):
     # Use reward from Guo et. al (2021)
     def _calc_reward(self, c: float, crash = False) -> float:
         if crash:
-            return -10.
+            return -20.
         n_dist_to_goal = self.xg - self.v.x_location[self.AGENT_ID]
         dist_diff = self.dist_to_goal - n_dist_to_goal
         
         # Distance reward
-        # dr = np.sign(dist_diff) * pow(c, dist_diff)
+        dr = np.sign(dist_diff) * pow(c, dist_diff)
         
         # Angle between agent and its leader
-        cos_theta = self._angle_to_closest_vessel(self._closest_vessel)
-        theta = math.acos(cos_theta) * 180/math.pi
-        print(f"Theta =  {theta}")
+        # cos_theta = self._angle_to_closest_vessel(self._closest_vessel)
+        # theta = math.acos(cos_theta) * 180/math.pi
+        # print(f"Theta =  {theta}")
 
-        if theta > 45:
-            angle_reward = 1.
-        else:
-            angle_reward = 0.
+        # if theta > 45:
+        #     angle_reward = 1.
+        # else:
+        #     angle_reward = 0.
         
-        if self.v.overtaking_level[self.AGENT_ID] != 0:
-            otl_reward = -0.01
-        else:
-            otl_reward = 0.
+        # if self.v.overtaking_level[self.AGENT_ID] != 0:
+        #     otl_reward = -0.01
+        # else:
+        #     otl_reward = 0.
         
-        self.dist_to_goal = n_dist_to_goal
+        # self.dist_to_goal = n_dist_to_goal
         
-        return otl_reward + angle_reward
+        return dr
 
     # Find the closest vessel to the agent in the same dir as the agent
     def _closest_vessel(self, dir = 1) -> int:
@@ -387,7 +388,7 @@ def _generate_ylocs(directions: np.array) -> np.array:
     return np.array([190. if n==1 else 310. for n in directions])
 
 def _rand_powers(n_vessels: int) -> np.array:
-    return np.array([random.randrange(3E5, 6E5, 5E4) for _ in range(n_vessels)])
+    return np.array([random.randrange(3E5, 4E5, 5E4) for _ in range(n_vessels)])
 
 # Timestep counter
 def counter() -> Callable:

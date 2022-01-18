@@ -20,7 +20,8 @@ class Persist(gym.Env):
 
         # Path to initial config file. This is still needed to initialize the
         # river correctly, although all values get overwritten anyways
-        self.c_path = "/home/s2075466/persist_data/train.ini"
+        #self.c_path = "/home/s2075466/persist_data/train.ini"
+        self.c_path = "/home/niklaspaulig/Dropbox/TU Dresden/persist_python/train.ini"
 
         # Overwrite the number of ships to initialize.
         _overwrite_config(self.c_path, vessels)
@@ -53,14 +54,11 @@ class Persist(gym.Env):
         self.tc = counter()
         self.current_timestep = self.tc()
 
-        self.max_episode_steps = 2000
+        self.max_episode_steps = 8000
 
         # Make the rhine data globally available to the methods of the class
         self.r = r.River(self.c_path)
-        self.v = v.Ships(self.r, self.c_path)
-
-        # Initializer renderer
-        self.plotter = Plotter(self.r,self.v,self.c_path)
+        #self.v = v.Ships(self.r, self.c_path)
 
         self.max_power = 1E6
         self.max_x = self.r.water_depth.shape[0] * \
@@ -78,18 +76,18 @@ class Persist(gym.Env):
         self.crash_dist = 5  # Minimum distance from border causing a crash
 
         # Anything reward
-        self.r_const = 1.05
+        self.r_const = 1.1
 
         # Gym inherits
         self.observation_space = spaces.Box(
-                high=np.inf, low=-np.inf, shape=((7*self.n_vessel+11),))
+                high=np.inf, low=-np.inf, shape=((9*self.n_vessel+11),))
 
         self.action_space = spaces.Box(low=-1., high=1., shape=(2, 1))
 
     def reset(self):
 
         # Randomize the initial starting position of the agent
-        self.agent_x_start = np.float(random.randrange(20_000, 30_000, 100))
+        self.agent_x_start = float(random.randrange(20_000, 90_000, 500))
 
         # Generate random directions for non-agent-vessels
         dirs = _rand_directions(self.n_vessel - 1)
@@ -100,6 +98,9 @@ class Persist(gym.Env):
 
         # Load an empty ship instance in order to manually override its values
         self.v = v.Ships(self.r, self.c_path)
+
+        # Initializer renderer
+        self.plotter = Plotter(self.r,self.v,self.c_path)
 
         # Override vessel properties according to train env
         self.v.num_ships = self.n_vessel
@@ -123,12 +124,12 @@ class Persist(gym.Env):
         #
         # ------------------------------------------------------------------------
         # |equal dist| is currently set to 300, however this is arbitrary
-        equaldist = 500
+        self.equaldist = 500
         self.v.x_location = np.array([
             np.array([self.agent_x_start]),
             self.agent_x_start +
-            np.linspace(equaldist, (self.n_vessel-1)
-                        * equaldist, self.n_vessel-1)
+            np.linspace(self.equaldist, (self.n_vessel-1)
+                        * self.equaldist, self.n_vessel-1)
         ], dtype=object)
         self.v.x_location = np.hstack(self.v.x_location)
 
@@ -152,6 +153,8 @@ class Persist(gym.Env):
         str_vel = self.r.mean_stream_vel(self.v)
 
         lat_action, long_action = action
+
+        long_action = 0. if long_action < 0 else long_action
 
         self.v.power[self.AGENT_ID] = np.maximum(0, self.v.desired_power[self.AGENT_ID] * long_action)
 
@@ -294,12 +297,12 @@ class Persist(gym.Env):
         self.resp = []
 
     # Check whether the spawning of a new vessel would cause a collision
-    # i.e See if a vessel is present 2 time its length around the xloc of the vessel to be spawned
+    # i.e See if a vessel is present inside the 
+    # equaldist of the last vessel in ascending x direction
     def _spawn_collision(self, spawn_loc: float) -> bool:
         for id in self.v.ship_id:
             xpos = self.v.x_location[id]
-            l = self.v.length[id]
-            if abs(spawn_loc - xpos) < 2*l:
+            if abs(spawn_loc - xpos) < self.v.length[self.AGENT_ID]:
                 return True
             else:
                 continue
@@ -314,13 +317,21 @@ class Persist(gym.Env):
         dist_diff = self.dist_to_goal - n_dist_to_goal
 
         # Distance reward
-        dr = np.sign(dist_diff) * pow(c, dist_diff)
+        dr = (np.sign(dist_diff) * pow(c, dist_diff))
+
 
         # Get the distance to the fairway border and
         # the reward based on it
-        lane_reward = self._lane_reward(self.dist_to_any_border)
+        if self.dist_to_any_border < 60. or self.dist_to_any_border > 200.:
+             lane_reward = -10
+        else:
+            lane_reward = 0.
 
-        ttc = self._ttc_reward()
+        min_ttc = np.amin(self.v.pol[self.AGENT_ID].ttc)
+        if min_ttc < 0.04:
+            ttc = -10
+        else:
+            ttc = 0.
 
         # Overwrite the current distance to the goal
         # with the new distance
@@ -328,12 +339,12 @@ class Persist(gym.Env):
 
         if crash:
             # TODO Relate to lane and distance reward
-            return -0.1 * (dr + lane_reward + ttc)
+            return -50
         return dr + lane_reward + ttc
 
     # Reset x and y dynamics for a given vessel ID
     def _reset_dynamics(self, ID: int) -> None:
-        self.v.vx[ID] = np.array([1. if self.v.direction[ID] == 1 else -1.])
+        self.v.vx[ID] = 0.
         self.v.vy[ID] = 0.
         self.v.ax[ID] = 0.
         self.v.ay[ID] = 0.
@@ -343,37 +354,55 @@ class Persist(gym.Env):
     def _done(self) -> bool:
         return False
 
+    # def _lane_reward(self, dist: float) -> float:
+
+    #     def base(x):
+    #         return -1/(0.01*x)
+
+    #     if dist > self.crash_dist and dist < self.opt_dist:
+    #         return base(dist) - base(self.opt_dist)
+    #     else:
+    #         return -pow(dist - self.opt_dist, 2)/pow(self.opt_dist, 2)
+    
     def _lane_reward(self, dist: float) -> float:
 
-        def base(x):
-            return -1/(0.1*x)
+        d_opt = self.opt_dist
+        s_1 = 8.
+        s_2 = 10.
+        b_1 = 2.
+        b_2 = 0.8
 
-        if dist > self.crash_dist and dist < self.opt_dist:
-            return base(dist) - base(self.opt_dist)
+        def base(dist,d_opt,s,b):
+            return -pow((dist-d_opt)/s,b)
+
+        if dist <= d_opt:
+            return base(dist,d_opt,s_1,b_1)
         else:
-            return -pow(dist - self.opt_dist, 2)/pow(self.opt_dist, 2)
-    
+            return base(dist,d_opt,s_2,b_2)
+
     # Calculate reward for time to collision. If vessel is more than 
     def _ttc_reward(self):
         
         # Get the lowest ttc
         min_ttc = np.amin(self.v.pol[self.AGENT_ID].ttc)
         
-        if min_ttc > 60.:
+        if min_ttc > 40.:
             return 0.
-        
-        def int_sqrt(x, n = 5):
-            return math.sqrt(n*x)
 
-        return int_sqrt(min_ttc) - int_sqrt(self.opt_dist)
+        s = 8.
+        b = 2.
 
-    def render(self, mode="human"):
+        def base(dist,d_opt,s,b):
+            return -pow((dist-d_opt)/s,b)
+            
+        return base(min_ttc,self.opt_dist,s,b)
+
+    def render(self, mode="human", reward = None):
 
         if mode == "human":
-            self.plotter.update()
+            self.plotter.update(reward)
         else:
-            raise NotImplementedError(
-                "Only human render mode available for now")
+            raise NotImplementedError("Only human render mode available for now")
 
 
 # Helper functions
@@ -416,4 +445,10 @@ def _overwrite_config(path: str, n_vessels: int) -> None:
     with open(path, "w") as f:
         conf.write(f)
 
-# ---------------------------------------------
+
+# env = Persist(10)
+# s = env.reset()
+
+# for _ in range(1000):
+#     s2,r,d,_ = env.step([0.,0.])
+#     env.render()

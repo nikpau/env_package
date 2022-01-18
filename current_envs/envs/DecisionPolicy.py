@@ -194,6 +194,15 @@ class DecisionPolicy(gym.Env):
                 return state, reward, done, {e}
             else:
                 raise RuntimeError(f"Vessel {e[1]} crashed. Pls investigate!")
+
+        # Crash handling. Check if the agent vessel intersects with any other vessel.
+        for id in range(1, self.v.num_ships):
+            if self.v.heading_box[self.AGENT_ID].intersects(self.v.heading_box[id]):
+                reward = self._calc_reward(self.r_const, crash=True)
+                done = True
+                state = np.array([self._get_vessel_propterties(),
+                                  self._get_river_properties()])
+                return state, reward, done, {}
         
         reward = self._calc_reward(self.r_const)
         done = self._done()
